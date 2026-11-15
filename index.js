@@ -1,7 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import 'dotenv/config'
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 const app = express()
 const port = process.env.PORT
 app.use(cors({ origin: process.env.FRONTEND_ORIGINE }));
@@ -83,7 +83,29 @@ app.get('/destinations', async (req, res) => {
      const cursor = await allDestinations.find({}).toArray();
      res.send(cursor)
 })
+app.get('/destinations/:id', async (req, res) => {
+     const {id} = req.params
+     const result = await allDestinations.findOne({_id: new ObjectId(id)})
+     res.send(result)
+})
 
+app.patch('/destinations/:id', async(req, res)=>{
+    const {id} = req.params;
+    const newData = req.body;
+    const result = await allDestinations.updateOne({_id: new ObjectId(id)},{$set: newData})
+    res.json(result);
+})
+
+app.delete("/destinations/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await allDestinations.deleteOne({ _id: new ObjectId(id) });
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Could not delete destination" });
+  }
+});
 
 app.use((err, req, res, next) => {
     if (err?.type === "entity.parse.failed") {
