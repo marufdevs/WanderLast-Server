@@ -22,11 +22,21 @@ const myDB = connection.db("Wanderlast");
 const allDestinations = myDB.collection("destinations");
 const allBookings = myDB.collection("allBookings");
 
+//middle ware 
+const verifyUser = (req, res, next) => {
+  const verify = req.headers.authorization;
+  if (verify !== "user loged in") {
+    return res.status(401).send({ message: "You are a hacker" })
+  }
+  next();
+}
+
+
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  res.send("Hello cuty!");
 });
 
-app.post("/add-new-destination", async (req, res) => {
+app.post("/add-new-destination", verifyUser, async (req, res) => {
   const body = req.body ?? {};
   const required = [
     "destinationName",
@@ -84,13 +94,15 @@ app.get("/destinations", async (req, res) => {
   const cursor = await allDestinations.find({}).toArray();
   res.send(cursor);
 });
-app.get("/destinations/:id", async (req, res) => {
+
+
+app.get("/destinations/:id", verifyUser ,async (req, res) => {
   const { id } = req.params;
   const result = await allDestinations.findOne({ _id: new ObjectId(id) });
   res.send(result);
 });
 
-app.patch("/destinations/:id", async (req, res) => {
+app.patch("/destinations/:id", verifyUser ,async (req, res) => {
   const { id } = req.params;
   const newData = req.body;
   const result = await allDestinations.updateOne(
@@ -100,7 +112,7 @@ app.patch("/destinations/:id", async (req, res) => {
   res.json(result);
 });
 
-app.delete("/destinations/:id", async (req, res) => {
+app.delete("/destinations/:id", verifyUser, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await allDestinations.deleteOne({ _id: new ObjectId(id) });
@@ -111,19 +123,19 @@ app.delete("/destinations/:id", async (req, res) => {
   }
 });
 
-app.post("/booking", async (req, res) => {
+app.post("/booking", verifyUser ,async (req, res) => {
   const data = req.body;
   const result = await allBookings.insertOne(data);
   res.json(result);
 });
 
-app.get("/bookings/:email", async (req, res) => {
+app.get("/bookings/:email", verifyUser, async (req, res) => {
   const { email } = req.params;
   const result = await allBookings.find({ "user.email": email }).toArray();
   res.json(result);
 });
 
-app.delete("/bookings/:id", async (req, res) => {
+app.delete("/bookings/:id", verifyUser, async (req, res) => {
   try {
     const { id } = req.params;
     const email = req.query.email;
