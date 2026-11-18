@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import { MongoClient, ObjectId } from "mongodb";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 const app = express();
 const port = process.env.PORT;
 app.use(cors({ origin: process.env.FRONTEND_ORIGINE }));
@@ -22,21 +23,37 @@ const myDB = connection.db("Wanderlast");
 const allDestinations = myDB.collection("destinations");
 const allBookings = myDB.collection("allBookings");
 
-//middle ware 
-const verifyUser = (req, res, next) => {
-  const verify = req.headers.authorization;
-  if (verify !== "user loged in") {
-    return res.status(401).send({ message: "You are a hacker" })
-  }
-  next();
-}
+//middle ware
+const FRONTEND_ORIGINE = process.env.FRONTEND_ORIGINE;
+const JWKS = createRemoteJWKSet(
+  new URL(`${FRONTEND_ORIGINE}/api/auth/jwks`),
+);
 
+const verifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ message: "Missing or invalid authorization header." });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+    return next();
+  } catch (error) {
+    console.error("Token validation failed:", error);
+    return res.status(401).json({ message: "Invalid or expired token." });
+  }
+};
 
 app.get("/", (req, res) => {
   res.send("Hello cuty!");
 });
 
-app.post("/add-new-destination", verifyUser, async (req, res) => {
+app.post("/add-new-destination", verifyToken, async (req, res) => {
   const body = req.body ?? {};
   const required = [
     "destinationName",
@@ -95,14 +112,13 @@ app.get("/destinations", async (req, res) => {
   res.send(cursor);
 });
 
-
-app.get("/destinations/:id", verifyUser ,async (req, res) => {
+app.get("/destinations/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const result = await allDestinations.findOne({ _id: new ObjectId(id) });
   res.send(result);
 });
 
-app.patch("/destinations/:id", verifyUser ,async (req, res) => {
+app.patch("/destinations/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const newData = req.body;
   const result = await allDestinations.updateOne(
@@ -112,7 +128,7 @@ app.patch("/destinations/:id", verifyUser ,async (req, res) => {
   res.json(result);
 });
 
-app.delete("/destinations/:id", verifyUser, async (req, res) => {
+app.delete("/destinations/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await allDestinations.deleteOne({ _id: new ObjectId(id) });
@@ -123,19 +139,19 @@ app.delete("/destinations/:id", verifyUser, async (req, res) => {
   }
 });
 
-app.post("/booking", verifyUser ,async (req, res) => {
+app.post("/booking", verifyToken, async (req, res) => {
   const data = req.body;
   const result = await allBookings.insertOne(data);
   res.json(result);
 });
 
-app.get("/bookings/:email", verifyUser, async (req, res) => {
+app.get("/bookings/:email", verifyToken, async (req, res) => {
   const { email } = req.params;
   const result = await allBookings.find({ "user.email": email }).toArray();
   res.json(result);
 });
 
-app.delete("/bookings/:id", verifyUser, async (req, res) => {
+app.delete("/bookings/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const email = req.query.email;
